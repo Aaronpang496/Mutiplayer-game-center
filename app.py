@@ -5,62 +5,101 @@ import io
 import time
 import random
 
-st.set_page_config(page_title="Project: Bounty", page_icon="🎯", layout="centered")
+st.set_page_config(page_title="Snap Hunt", page_icon="🎯", layout="centered")
 
-# --- HIGH-ACTION CSS ---
+# --- PROFESSIONAL GAME CSS ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Nunito:wght@400;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
     
-    h1, h2, h3 { font-family: 'Black Ops One', cursive; letter-spacing: 1px; text-transform: uppercase; }
-    html, body, [class*="css"] { font-family: 'Nunito', sans-serif; }
+    /* Global Dark Theme */
+    .stApp { background-color: #0a0a0a; color: #ffffff; font-family: 'Rajdhani', sans-serif; }
     
-    @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-    .timer-box { background: #ff0000; color: white; padding: 20px; text-align: center; border-radius: 15px; font-size: 60px; font-weight: 900; animation: flash 1s infinite; margin-bottom: 20px;}
+    /* Neon Glow Titles */
+    h1, h2, h3 { font-family: 'Rajdhani', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+    .game-title { color: #00ffcc; text-align: center; font-size: 45px; text-shadow: 0px 0px 15px rgba(0, 255, 204, 0.6); margin-bottom: 0px; }
+    .subtitle { color: #888; text-align: center; font-size: 16px; margin-bottom: 30px; letter-spacing: 1px; }
     
-    .target-card { background: #111; color: #00ffcc; padding: 30px; text-align: center; border-radius: 15px; border: 4px dashed #00ffcc; font-size: 30px; font-weight: 900; margin-bottom: 20px; }
+    /* The Timer HUD */
+    .timer-container { display: flex; justify-content: center; margin-bottom: 20px; }
+    .timer-circle {
+        width: 120px; height: 120px; border-radius: 50%;
+        background: #1a0000; border: 4px solid #ff0000;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 50px; font-weight: 700; color: #ff0000;
+        box-shadow: 0px 0px 30px rgba(255, 0, 0, 0.5);
+        animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse { 0% { box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.3); } 100% { box-shadow: 0px 0px 40px rgba(255, 0, 0, 0.8); } }
     
-    .commentator-box { background: #222; border-left: 10px solid #ff0040; padding: 20px; font-size: 22px; font-style: italic; color: #fff; margin-top: 20px; border-radius: 5px; }
+    /* Target Card */
+    .target-hud {
+        background: linear-gradient(90deg, #001a1a, #000000, #001a1a);
+        border-left: 6px solid #00ffcc; border-right: 6px solid #00ffcc;
+        padding: 20px; text-align: center; margin-bottom: 20px;
+        font-size: 24px; font-weight: 700; color: #ffffff;
+        text-shadow: 0px 0px 10px rgba(0, 255, 204, 0.5);
+    }
+    .target-highlight { color: #00ffcc; font-size: 28px; text-decoration: underline; }
     
-    .stButton>button { border-radius: 10px; font-weight: 900; font-size: 20px; border: 3px solid #000; box-shadow: 4px 4px 0 #000; transition: all 0.1s; }
-    .stButton>button:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #000; background-color: #00ffcc; color: black; }
+    /* AI Commentator Box */
+    .ai-commentator {
+        background: rgba(0, 255, 204, 0.05);
+        border: 1px solid #00ffcc; border-radius: 10px;
+        padding: 20px; margin-top: 20px;
+        font-size: 20px; line-height: 1.5; color: #00ffcc;
+        box-shadow: inset 0px 0px 20px rgba(0, 255, 204, 0.1);
+    }
+    .roast-text { color: #ff0040; }
+    
+    /* Game Buttons */
+    .stButton>button {
+        width: 100%; border-radius: 8px; font-weight: 700; font-size: 20px;
+        text-transform: uppercase; letter-spacing: 2px;
+        background-color: #00ffcc; color: #000000; border: none;
+        padding: 15px; transition: all 0.2s;
+    }
+    .stButton>button:hover { background-color: #ffffff; color: #000000; box-shadow: 0px 0px 20px rgba(255, 255, 255, 0.5); transform: scale(1.02); }
+    
+    /* Hide Streamlit Header */
+    header {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- AI COMMENTATOR ---
+# --- FAST AI VISION ---
 def get_ai_comment(image_bytes, target):
     try:
         files = {'image': ('image.jpg', image_bytes, 'image/jpeg')}
         
-        # The prompt tells the AI to act like an aggressive, funny commentator
         prompt = f"""
-        You are an aggressive, hilarious sports commentator and AI referee. 
+        You are an aggressive, hilarious AI referee. 
         The user was told to find: '{target}'.
         Look at the attached photo.
         
-        If the photo actually contains the target, start your response with: "CORRECT! "
-        If the photo does NOT contain the target, start your response with: "WRONG! "
+        If the photo contains the target, start your response with exactly: "CORRECT! "
+        If the photo does NOT contain the target, start your response with exactly: "WRONG! "
         
-        Follow the prefix with a single, highly dramatic, sarcastic, or funny sentence roasting the user or hyping them up based on what you see in the photo.
+        Follow the prefix with a single, highly dramatic, sarcastic sentence judging what you see.
         """
         
         data = {'prompt': prompt}
         response = requests.post("https://vision.pollinations.ai/analyze", files=files, data=data, timeout=15)
         
         if response.status_code == 200:
-            return response.json().get("response", "WRONG! The AI judge is blind. You fail.")
-        return "WRONG! The AI took a nap. You fail by default."
+            return response.json().get("response", "WRONG! The AI judge is blind.")
+        return "WRONG! The AI took a nap."
     except:
-        return "WRONG! The referee fell asleep at the wheel."
+        return "WRONG! Connection lost."
 
-# --- TARGET POOL (Made harder and funnier) ---
+# --- TARGET POOL ---
 TARGETS = [
     "Something older than you", "Something that makes noise", 
     "Something with a face", "Something shiny", 
     "Something you can drink", "Something red", 
     "Something that fits in your pocket", "A shoe",
-    "Something soft", "Something that smells weird",
-    "Something you would use as a weapon in a zombie apocalypse"
+    "Something soft", "Something that smells weird"
 ]
 
 # --- STATE ---
@@ -73,14 +112,16 @@ if "time_limit" not in st.session_state: st.session_state.time_limit = 30
 if "judge_result" not in st.session_state: st.session_state.judge_result = ""
 
 # --- MAIN UI ---
-st.markdown('<h1 style="text-align:center; color:#ff0040;">🎯 PROJECT: BOUNTY</h1>', unsafe_allow_html=True)
+st.markdown('<div class="game-title">SNAP HUNT</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">AI REFEREE // 15 SECOND LIMIT</div>', unsafe_allow_html=True)
 
 # START SCREEN
 if st.session_state.game_state == "start":
-    st.write("You have a randomly generated time limit to find the target and snap a photo. The AI is your judge and commentator. Don't embarrass yourself.")
-    if st.button("🚀 START MISSION", type="primary", use_container_width=True):
+    st.info("The AI will give you a target. You must find it and snap a photo before the timer hits zero. The AI will judge you.")
+    st.write("")
+    if st.button("🚀 INITIATE MISSION"):
         st.session_state.target = random.choice(TARGETS)
-        st.session_state.time_limit = random.choice([15, 20, 30]) # Random difficulty!
+        st.session_state.time_limit = random.choice([15, 20, 30])
         st.session_state.start_time = time.time()
         st.session_state.game_state = "playing"
         st.session_state.judge_result = ""
@@ -91,10 +132,16 @@ elif st.session_state.game_state == "playing":
     elapsed = time.time() - st.session_state.start_time
     time_left = max(0, st.session_state.time_limit - int(elapsed))
     
-    # Display Timer and Target
-    st.markdown(f'<div class="timer-box">{time_left}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="target-card">FIND: {st.session_state.target}</div>', unsafe_allow_html=True)
-    st.write(f"🔥 **Current Streak:** {st.session_state.streak}")
+    # Timer
+    st.markdown(f'<div class="timer-container"><div class="timer-circle">{time_left}</div></div>', unsafe_allow_html=True)
+    
+    # Target
+    st.markdown(f'<div class="target-hud">TARGET ACQUIRED:<br><span class="target-highlight">{st.session_state.target.upper()}</span></div>', unsafe_allow_html=True)
+    
+    # Stats
+    col1, col2 = st.columns(2)
+    col1.metric("SCORE", st.session_state.score)
+    col2.metric("STREAK", st.session_state.streak)
     
     # Check if time ran out
     if time_left <= 0:
@@ -102,26 +149,24 @@ elif st.session_state.game_state == "playing":
         st.rerun()
     
     # Camera
-    camera_image = st.camera_input("Snap the target NOW!")
+    camera_image = st.camera_input("SNAP TARGET")
     
     if camera_image:
-        with st.spinner("AI Commentator is looking at your evidence..."):
+        with st.spinner("AI ANALYZING..."):
             img = Image.open(camera_image)
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='JPEG')
             img_bytes = img_byte_arr.getvalue()
             
-            # Get AI Commentator response
             result = get_ai_comment(img_bytes, st.session_state.target)
             st.session_state.judge_result = result
             
-            # Check the result
             if result.upper().startswith("CORRECT"):
                 st.session_state.score += 1
                 st.session_state.streak += 1
                 st.session_state.game_state = "win"
             else:
-                st.session_state.streak = 0 # Reset streak on wrong answer
+                st.session_state.streak = 0
                 st.session_state.game_state = "lose"
             st.rerun()
 
@@ -131,39 +176,38 @@ elif st.session_state.game_state == "playing":
 
 # WIN SCREEN
 elif st.session_state.game_state == "win":
-    st.success("✅ TARGET ACQUIRED")
+    st.success("TARGET VERIFIED")
+    st.markdown(f'<div class="ai-commentator">{st.session_state.judge_result}</div>', unsafe_allow_html=True)
     
-    # Show the AI's hilarious comment
-    st.markdown(f'<div class="commentator-box">{st.session_state.judge_result}</div>', unsafe_allow_html=True)
-    
-    st.metric("Score", st.session_state.score, delta=f"Streak: {st.session_state.streak}")
-    
-    if st.button("Next Target ➡️", type="primary"):
+    st.write("")
+    if st.button("NEXT TARGET ➡️"):
         st.session_state.target = random.choice(TARGETS)
         st.session_state.time_limit = random.choice([15, 20, 30])
         st.session_state.start_time = time.time()
         st.session_state.game_state = "playing"
         st.rerun()
 
-# LOSE SCREEN (Wrong Object or Fail)
+# LOSE SCREEN
 elif st.session_state.game_state == "lose":
-    st.error("❌ TARGET NOT FOUND")
+    st.error("TARGET REJECTED")
+    st.markdown(f'<div class="ai-commentator roast-text">{st.session_state.judge_result}</div>', unsafe_allow_html=True)
     
-    # Show the AI's roast
-    st.markdown(f'<div class="commentator-box">{st.session_state.judge_result}</div>', unsafe_allow_html=True)
-    
-    if st.button("Try Again (Timer continues!)", type="primary"):
-        # Note: We do NOT reset start_time, so the timer keeps ticking!
+    st.write("")
+    if st.button("CONTINUE (TIME STILL RUNNING)"):
         st.session_state.game_state = "playing"
         st.rerun()
 
-# GAME OVER SCREEN (Time ran out)
+# GAME OVER SCREEN
 elif st.session_state.game_state == "game_over":
-    st.markdown('<div class="timer-box">0</div>', unsafe_allow_html=True)
-    st.error("💀 TIME'S UP. MISSION FAILED.")
-    st.metric("Final Score", st.session_state.score)
+    st.markdown(f'<div class="timer-container"><div class="timer-circle">0</div></div>', unsafe_allow_html=True)
+    st.error("MISSION FAILED")
     
-    if st.button("Restart Game", type="primary"):
+    col1, col2 = st.columns(2)
+    col1.metric("FINAL SCORE", st.session_state.score)
+    col2.metric("BEST STREAK", st.session_state.streak)
+    
+    st.write("")
+    if st.button("RESTART SYSTEM"):
         st.session_state.score = 0
         st.session_state.streak = 0
         st.session_state.game_state = "start"
