@@ -4,56 +4,55 @@ import time
 import random
 import re
 
-st.set_page_config(page_title="AI Survival", page_icon="💀", layout="centered")
+st.set_page_config(page_title="AI SURVIVAL", page_icon="⚠️", layout="centered")
 
-# --- MOBILE-FRIENDLY CYBERPUNK CSS ---
+# --- ACTION GAME CSS ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
     
-    /* Global Dark Theme */
     .stApp { background-color: #050505; color: #00ff00; font-family: 'Share Tech Mono', monospace; }
+    h1, h2, h3 { color: #ff0040; text-transform: uppercase; text-align: center; text-shadow: 0 0 10px #ff0040; }
     
-    h1, h2, h3 { color: #00ff00; text-transform: uppercase; text-align: center; text-shadow: 0 0 10px #00ff00; }
-    
-    /* The Story Terminal */
     .terminal-box {
         background-color: #0a0a0a;
-        border-left: 4px solid #00ff00;
+        border: 1px solid #ff0040;
         padding: 15px;
         border-radius: 5px;
-        box-shadow: 0 0 15px rgba(0, 255, 0, 0.1);
-        margin-bottom: 20px;
-        font-size: 18px;
-        line-height: 1.5;
+        box-shadow: 0 0 15px rgba(255, 0, 64, 0.2);
+        margin-bottom: 15px;
+        font-size: 16px;
+        line-height: 1.4;
     }
     
-    /* The Big Visual Area */
     .visual-display {
-        text-align: center;
-        font-size: 80px; /* Huge Emojis */
-        margin: 20px 0;
-        animation: float 3s ease-in-out infinite;
-    }
-    @keyframes float {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-15px); }
-        100% { transform: translateY(0px); }
+        text-align: center; font-size: 100px; margin: 20px 0;
+        animation: glitch 1s linear infinite;
     }
     
-    /* Status Bars */
-    .status-bar { display: flex; justify-content: space-between; font-weight: bold; font-size: 20px; margin-bottom: 10px; }
-    .lives { color: #ff0000; text-shadow: 0 0 10px #ff0000; }
-    .score { color: #00ffff; text-shadow: 0 0 10px #00ffff; }
-    
-    /* Input Field & Button */
-    .stTextInput>div>div>input {
-        background-color: #000000; color: #00ff00; border: 1px solid #00ff00; font-family: 'Share Tech Mono', monospace; font-size: 18px; border-radius: 0;
+    @keyframes glitch {
+        2%, 64% { transform: translate(2px,0) skew(0deg); }
+        4%, 60% { transform: translate(-2px,0) skew(0deg); }
+        62% { transform: translate(0,0) skew(5deg); }
     }
+    
+    .timer-hud {
+        background-color: #111; border: 2px solid #00ffcc; padding: 10px;
+        text-align: center; font-size: 20px; font-weight: bold; color: #00ffcc;
+        margin-bottom: 15px; box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+    }
+    
+    .status-bar { display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; margin-bottom: 10px; color: #fff;}
+    .inventory { color: #00ffff; font-size: 14px; margin-bottom: 10px; }
+    
     .stButton>button {
-        background-color: #000000; color: #00ff00; border: 2px solid #00ff00; font-family: 'Share Tech Mono', monospace; font-weight: bold; font-size: 18px; width: 100%; transition: all 0.2s; border-radius: 0;
+        background-color: #111; color: #fff; border: 1px solid #444; font-family: 'Share Tech Mono', monospace; font-weight: bold; font-size: 16px; width: 100%; border-radius: 0; padding: 15px;
     }
-    .stButton>button:hover { background-color: #00ff00; color: #000000; box-shadow: 0 0 20px #00ff00; }
+    .stButton>button:hover { background-color: #ff0040; color: #fff; border-color: #ff0040; box-shadow: 0 0 15px #ff0040; }
+    
+    /* Win / Lose Screen Styles */
+    .win-box { background-color: #003311; border: 2px solid #00ff00; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; color: #00ff00; text-shadow: 0 0 10px #00ff00; }
+    .lose-box { background-color: #330000; border: 2px solid #ff0000; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; color: #ff0000; text-shadow: 0 0 10px #ff0000; }
     
     header {visibility: hidden;}
     #MainMenu {visibility: hidden;}
@@ -61,128 +60,180 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- VISUAL POOL (EMOJIS) ---
 VISUALS = ["👾", "🤖", "☠️", "🔥", "🌌", "🚨", "🌀", "👁️", "🧬", "⚡"]
 
-# --- AI GENERATION FUNCTIONS ---
-def get_starting_scene():
-    prompt = """
-    You are the Game Master of a deadly text adventure game. The player is trapped in a glitchy sci-fi simulation.
-    Generate a random, crazy starting scenario. 
-    You must reply in EXACTLY this format:
-    [TITLE]: (A short 1-3 word dramatic title, like "THE AWAKENING" or "GRAVITY FAILURE")
-    [STATUS]: ALIVE
-    [STORY]: (Write a short paragraph, max 3 sentences, describing where they are and the immediate danger.)
-    """
-    try:
-        response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}")
-        return response.text.strip()
-    except:
-        return "[TITLE]: SYSTEM ERROR\n[STATUS]: ALIVE\n[STORY]: The simulation stutters."
+# --- AI GENERATION ---
+def generate_scene(action, current_story, turn, lives, inventory):
+    if turn > 5:
+        return "[TITLE]: ESCAPE\n[STATUS]: WON\n[STORY]: You override the final firewall. The simulation shatters. You are free."
 
-def generate_next_scene(action, current_story):
     prompt = f"""
-    You are the Game Master of a deadly text adventure game. The player is trapped in a glitchy sci-fi simulation.
-    Current Story: {current_story}
+    You are a hostile, sarcastic AI Game Master. The player is trapped in your simulation.
+    Story so far: {current_story}
     Player Action: {action}
+    Turn: {turn}/5
+    Player Inventory: {inventory}
     
-    You must reply in EXACTLY this format:
-    [TITLE]: (A short 1-3 word dramatic title for this new scene)
-    [STATUS]: (Write strictly "ALIVE" if they survive, or "DEAD" if they fail/die)
-    [STORY]: (Write a short paragraph, max 3 sentences, describing what happens next. Be dark, sarcastic, and fast-paced.)
+    RULES:
+    1. Write 1-2 short, punchy sentences describing what happens.
+    2. If they succeed, give them an item for their inventory (e.g., "You find a [Keycard]").
+    3. If they do something stupid, put "DEAD" in the status.
+    4. If they survive, put "ALIVE".
+    
+    Reply in EXACTLY this format:
+    [TITLE]: (1-2 word dramatic title)
+    [STATUS]: (ALIVE or DEAD)
+    [STORY]: (The outcome)
     """
     try:
         response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}")
         return response.text.strip()
     except:
-        return "[TITLE]: GLITCH\n[STATUS]: ALIVE\n[STORY]: The simulation stutters."
+        return "[TITLE]: GLITCH\n[STATUS]: ALIVE\n[STORY]: The simulation freezes."
 
 def parse_ai_response(result):
     title_match = re.search(r"\[TITLE\]:\s*(.*)", result, re.IGNORECASE)
     status_match = re.search(r"\[STATUS\]:\s*(.*)", result, re.IGNORECASE)
     story_match = re.search(r"\[STORY\]:\s*(.*)", result, re.IGNORECASE | re.DOTALL)
     
-    title = title_match.group(1).strip() if title_match else "UNKNOWN SECTOR"
-    is_dead = "DEAD" in status_match.group(1).upper() if status_match else False
-    story = story_match.group(1).strip() if story_match else result
-    
-    return title, story, is_dead
+    return (
+        title_match.group(1).strip() if title_match else "UNKNOWN",
+        story_match.group(1).strip() if story_match else result,
+        status_match.group(1).strip().upper() if status_match else "ALIVE"
+    )
 
-# --- STATE MANAGEMENT ---
+# --- STATE ---
 if "lives" not in st.session_state: st.session_state.lives = 3
+if "turn" not in st.session_state: st.session_state.turn = 1
 if "score" not in st.session_state: st.session_state.score = 0
+if "inventory" not in st.session_state: st.session_state.inventory = []
 if "game_over" not in st.session_state: st.session_state.game_over = False
-if "initialized" not in st.session_state: st.session_state.initialized = False
-if "current_visual" not in st.session_state: st.session_state.current_visual = "💀"
-
-# Start game for the first time
-if not st.session_state.initialized:
-    with st.spinner("Booting simulation..."):
-        raw = get_starting_scene()
-        title, story, _ = parse_ai_response(raw)
-        st.session_state.title = title
-        st.session_state.story = story
-        st.session_state.current_visual = random.choice(VISUALS)
-        st.session_state.initialized = True
+if "game_won" not in st.session_state: st.session_state.game_won = False
+if "current_visual" not in st.session_state: st.session_state.current_visual = "⚠️"
+if "story" not in st.session_state: st.session_state.story = "You wake up on a digital dissection table. A laser is moving toward your chest. You have 5 turns to escape before the simulation deletes you."
+if "title" not in st.session_state: st.session_state.title = "THE AWAKENING"
+if "last_action_time" not in st.session_state: st.session_state.last_action_time = time.time()
 
 # --- MAIN UI ---
-st.markdown("<h1>💀 AI SURVIVAL 💀</h1>", unsafe_allow_html=True)
+st.markdown("<h1>⚠️ AI SURVIVAL</h1>", unsafe_allow_html=True)
 
-if st.session_state.game_over:
-    st.markdown(f"<h2 style='color:red; text-align:center;'>{st.session_state.title}</h2>", unsafe_allow_html=True)
-    st.markdown(f'<div class="visual-display">☠️</div>', unsafe_allow_html=True)
-    st.error("SYSTEM TERMINATED. YOU ARE DEAD.")
-    st.metric("Final Score", st.session_state.score)
-    if st.button("REBOOT SYSTEM"):
-        with st.spinner("Rebooting..."):
-            raw = get_starting_scene()
-            title, story, _ = parse_ai_response(raw)
-            st.session_state.title = title
-            st.session_state.story = story
-            st.session_state.lives = 3
-            st.session_state.score = 0
-            st.session_state.game_over = False
-            st.session_state.current_visual = random.choice(VISUALS)
-            st.rerun()
-else:
-    # Status Bar
+# ==========================================
+# WIN SCREEN (CELEBRATION)
+# ==========================================
+if st.session_state.game_won:
+    st.balloons() # Explodes balloons on the screen
+    st.markdown(f"<div class='visual-display'>🏆</div>", unsafe_allow_html=True)
+    
+    inv_text = ", ".join(st.session_state.inventory) if st.session_state.inventory else "Nothing but your wits"
+    
     st.markdown(f"""
-    <div class="status-bar">
-        <span class="lives">LIVES: {'❤️' * st.session_state.lives}</span>
-        <span class="score">SCORE: {st.session_state.score}</span>
+    <div class="win-box">
+        SYSTEM ESCAPED<br><br>
+        You hacked the simulation using: <br>
+        <span style="color:#fff;">{inv_text}</span><br><br>
+        Final Score: {st.session_state.score}
     </div>
     """, unsafe_allow_html=True)
     
-    # Dynamic Title
-    st.markdown(f"<h2 style='color:#00ffff; text-shadow: 0 0 10px #00ffff;'>{st.session_state.title}</h2>", unsafe_allow_html=True)
+    st.write("")
+    if st.button("🔄 SYSTEM OVERRIDE (PLAY AGAIN)"):
+        st.session_state.clear()
+        st.rerun()
+
+# ==========================================
+# LOSE SCREEN (DESTRUCTION)
+# ==========================================
+elif st.session_state.game_over:
+    st.markdown(f"<div class='visual-display'>☠️</div>", unsafe_allow_html=True)
     
-    # The Big Animated Emoji Visual
+    st.markdown(f"""
+    <div class="lose-box">
+        SYSTEM TERMINATED<br><br>
+        Your digital remains have been deleted.<br>
+        Final Score: {st.session_state.score}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.write("")
+    if st.button("🔄 SYSTEM OVERRIDE (TRY AGAIN)"):
+        st.session_state.clear()
+        st.rerun()
+
+# ==========================================
+# GAMEPLAY SCREEN
+# ==========================================
+else:
+    # TIMER CALCULATION
+    time_passed = time.time() - st.session_state.last_action_time
+    time_left = max(0, 15 - int(time_passed))
+    
+    if time_left == 0:
+        st.session_state.lives -= 1
+        st.session_state.story = "⚠️ HESITATION DETECTED. The system zapped you for being too slow."
+        st.session_state.last_action_time = time.time()
+        if st.session_state.lives <= 0:
+            st.session_state.game_over = True
+        st.rerun()
+
+    # Status UI
+    inv_text = ", ".join(st.session_state.inventory) if st.session_state.inventory else "Empty"
+    st.markdown(f"""
+    <div class="status-bar">
+        <span>LIVES: {'❤️' * st.session_state.lives}</span>
+        <span>TURN: {st.session_state.turn}/5</span>
+    </div>
+    <div class="inventory">🎒 INVENTORY: {inv_text}</div>
+    """, unsafe_allow_html=True)
+    
+    # THE VISIBLE TIMER
+    st.markdown(f'<div class="timer-hud">⏱️ ACT FAST: {time_left} SECONDS</div>', unsafe_allow_html=True)
+    
+    st.markdown(f"<h2 style='color:#fff; text-shadow: 0 0 10px #ff0040; font-size: 20px;'>{st.session_state.title}</h2>", unsafe_allow_html=True)
     st.markdown(f'<div class="visual-display">{st.session_state.current_visual}</div>', unsafe_allow_html=True)
-    
-    # Story Display
     st.markdown(f'<div class="terminal-box">{st.session_state.story}</div>', unsafe_allow_html=True)
     
-    # Action Input
-    with st.form(key="action_form", clear_on_submit=True):
-        action = st.text_input("What do you do?", placeholder="Type your action here...", label_visibility="collapsed")
-        submit = st.form_submit_button("EXECUTE ACTION")
+    # --- ACTION BUTTONS ---
+    st.write("CHOOSE YOUR ACTION:")
+    col1, col2, col3 = st.columns(3)
+    
+    action_taken = None
+    if col1.button("⚔️ FIGHT"):
+        action_taken = "I attack the threat with my bare hands."
+    if col2.button("💻 HACK"):
+        action_taken = "I try to hack into the nearest terminal."
+    if col3.button("🏃 RUN"):
+        action_taken = "I sprint away as fast as I can."
         
-    if submit and action:
-        with st.spinner("Processing reality..."):
-            # Get AI response
-            result = generate_next_scene(action, st.session_state.story)
-            title, story, is_dead = parse_ai_response(result)
+    with st.form(key="custom_action", clear_on_submit=True):
+        custom = st.text_input("Or type a custom action:", placeholder="e.g., I look under the table...", label_visibility="collapsed")
+        submit_custom = st.form_submit_button("EXECUTE")
+        if submit_custom and custom:
+            action_taken = custom
+
+    # Process Action
+    if action_taken:
+        with st.spinner("Processing..."):
+            result = generate_scene(action_taken, st.session_state.story, st.session_state.turn, st.session_state.lives, st.session_state.inventory)
+            title, story, status = parse_ai_response(result)
             
-            # Update state
+            st.session_state.current_visual = random.choice(VISUALS)
             st.session_state.title = title
-            st.session_state.story = f"> {action}\n\n{story}"
-            st.session_state.current_visual = random.choice(VISUALS) # Randomize visual
+            st.session_state.story = f"> {action_taken}\n\n{story}"
+            st.session_state.last_action_time = time.time() 
             
-            if is_dead:
+            items = re.findall(r"\[(.*?)\]", story)
+            for item in items:
+                if item.lower() not in ["alive", "dead", "won"] and item not in st.session_state.inventory:
+                    st.session_state.inventory.append(item)
+            
+            if status == "WON":
+                st.session_state.game_won = True
+            elif status == "DEAD":
                 st.session_state.lives -= 1
                 if st.session_state.lives <= 0:
                     st.session_state.game_over = True
             else:
                 st.session_state.score += 10
+                st.session_state.turn += 1
                 
             st.rerun()
