@@ -4,6 +4,7 @@ import requests
 import io
 import time
 import random
+import json
 
 st.set_page_config(page_title="Snap Hunt", page_icon="🎯", layout="centered")
 
@@ -61,7 +62,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FAST AI VISION ---
+# --- AI FUNCTIONS ---
 def get_ai_comment(image_bytes, target):
     try:
         files = {'image': ('image.jpg', image_bytes, 'image/jpeg')}
@@ -77,40 +78,57 @@ def get_ai_comment(image_bytes, target):
     except:
         return "ERROR"
 
-# --- TARGET POOL ---
-TARGETS = [
-    "Something older than you", "Something that makes noise", 
-    "Something with a face", "Something shiny", 
-    "Something you can drink", "Something red", 
-    "Something that fits in your pocket", "A shoe",
-    "Something soft", "Something that smells weird"
-]
+def get_location_targets(location):
+    try:
+        prompt = f"The user is currently in: {location}. Generate exactly 5 short, funny, and specific scavenger hunt targets they can find in this location. Return ONLY a JSON list of strings. Example: [\"A dusty book\", \"A broken pen\"]."
+        response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}")
+        if response.status_code == 200:
+            raw = response.text.strip()
+            if raw.startswith("```json"): raw = raw[7:-3]
+            start = raw.find('[')
+            end = raw.rfind(']')
+            if start != -1 and end != -1: raw = raw[start:end+1]
+            targets = json.loads(raw)
+            return targets
+        return []
+    except:
+        return []
 
 # --- STATE ---
-if "game_state" not in st.session_state: st.session_state.game_state = "start"
+if "game_state" not in st.session_state: st.session_state.game_state = "location"
 if "score" not in st.session_state: st.session_state.score = 0
 if "streak" not in st.session_state: st.session_state.streak = 0
 if "target" not in st.session_state: st.session_state.target = ""
 if "start_time" not in st.session_state: st.session_state.start_time = 0
 if "time_limit" not in st.session_state: st.session_state.time_limit = 30
 if "judge_result" not in st.session_state: st.session_state.judge_result = ""
+if "location_targets" not in st.session_state: st.session_state.location_targets = []
 if "camera_key" not in st.session_state: st.session_state.camera_key = 0
 
 # --- MAIN UI ---
 st.markdown('<div class="game-title">SNAP HUNT</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">AI REFEREE // FIND THE TARGET</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">AI REFEREE // LOCATION MODE</div>', unsafe_allow_html=True)
 
-# START SCREEN
-if st.session_state.game_state == "start":
-    st.info("The AI will give you a target. Find it and snap a photo before time runs out.")
+# LOCATION SCREEN
+if st.session_state.game_state == "location":
+    st.info("Where are you right now? The AI will generate a custom hunt for your location.")
+    location = st.text_input("Enter your location:", placeholder="e.g., My messy bedroom, School library, The kitchen")
+    
     st.write("")
-    if st.button("🚀 INITIATE MISSION"):
-        st.session_state.target = random.choice(TARGETS)
-        st.session_state.time_limit = random.choice([20, 30, 45]) 
-        st.session_state.start_time = time.time()
-        st.session_state.game_state = "playing"
-        st.session_state.judge_result = ""
-        st.rerun()
+    if st.button("🌍 GENERATE HUNT"):
+        if location.strip():
+            with st.spinner("Scanning location data..."):
+                targets = get_location_targets(location)
+                if targets:
+                    st.session_state.location_targets = targets
+                    st.session_state.target = random.choice(targets)
+                    st.session_state.time_limit = random.choice([20, 30, 45]) 
+                    st.session_state.start_time = time.time()
+                    st.session_state.game_state = "playing"
+                    st.session_state.judge_result = ""
+                    st.rerun()
+                else:
+                    st.error("AI failed to generate targets. Try again.")
 
 # PLAYING SCREEN
 elif st.session_state.game_state == "playing":
@@ -128,21 +146,25 @@ elif st.session_state.game_state == "playing":
         st.session_state.game_state = "game_over"
         st.rerun()
     
-    # --- THE NEW CAMERA & FLIP CONTROLS ---
+    # --- CAMERA & FLIP BUTTON ---
     st.write("---")
     
-    # We use columns to put a "Flip" button next to the camera label
-    cam_col, flip_col = st.columns([3, 1])
-    with cam_col:
-        st.write("📸 **BACK CAMERA (Scan Room)**")
-    with flip_col:
-        # This button increments the key, which forces Streamlit to reload the camera module
-        if st.button("🔄 FLIP"):
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.write("📸 **CAMERA**")
+    with col2:
+        # THE FLIP CAMERA BUTTON
+        if st.button("FLIP CAMERA"):
             st.session_state.camera_key += 1
             st.rerun()
 
-    # We dynamically assign the key based on our flip state
     camera_image = st.camera_input("Snap target", key=f"cam_{st.session_state.camera_key}", label_visibility="collapsed")
+    
+    # Upload fallback
+    with st.expander("📁 Or upload a photo instead"):
+        uploaded_file = st.file_uploader("Upload photo", type=["jpg", "jpeg", "png"])
+        if uploaded_file:
+            camera_image = uploaded_file
     
     if camera_image:
         with st.spinner("AI ANALYZING..."):
@@ -175,7 +197,9 @@ elif st.session_state.game_state == "win":
     
     st.write("")
     if st.button("NEXT TARGET ➡️"):
-        st.session_state.target = random.choice(TARGETS)
+        if st.session_state.location_targets:
+            remaining = [t for t in st.session_state.location_targets if t != st.session_state.target]
+            st.session_state.target = random.choice(remaining) if remaining else random.choice(st.session_state.location_targets)
         st.session_state.time_limit = random.choice([20, 30, 45])
         st.session_state.start_time = time.time()
         st.session_state.game_state = "playing"
@@ -214,5 +238,6 @@ elif st.session_state.game_state == "game_over":
     if st.button("RESTART SYSTEM"):
         st.session_state.score = 0
         st.session_state.streak = 0
-        st.session_state.game_state = "start"
+        st.session_state.game_state = "location"
+        st.session_state.location_targets = []
         st.rerun()
