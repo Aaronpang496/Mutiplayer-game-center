@@ -61,6 +61,15 @@ st.markdown("""
 
 VISUALS = ["👾", "🤖", "☠️", "🔥", "🌌", "🚨", "🌀", "👁️", "🧬", "⚡"]
 
+# --- LOCAL FALLBACK SCENARIOS (IF AI FAILS) ---
+FALLBACK_SCENARIOS = [
+    "[TITLE]: LASER GRID\n[STATUS]: ALIVE\n[STORY]: You dodge a sweeping laser beam. You find a [Metal Shield] on the floor.",
+    "[TITLE]: THE VOID\n[STATUS]: ALIVE\n[STORY]: You step into a dark room. A robotic voice says 'Wrong choice.' You barely escape with your life.",
+    "[TITLE]: GLITCH\n[STATUS]: ALIVE\n[STORY]: The simulation freezes for a second. You grab a [Data Chip] from the frozen screen.",
+    "[TITLE]: SENTRY\n[STATUS]: ALIVE\n[STORY]: A security drone spots you. You hide behind a pillar just in time.",
+    "[TITLE]: DATA STREAM\n[STATUS]: DEAD\n[STORY]: You touch the glowing wires. The system electrocutes you instantly."
+]
+
 # --- AI GENERATION ---
 def generate_starting_scene(difficulty):
     prompt = f"""
@@ -73,13 +82,14 @@ def generate_starting_scene(difficulty):
     """
     for attempt in range(2):
         try:
-            response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}", timeout=10)
+            # Increased timeout to 20 seconds to prevent crashes
+            response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}", timeout=20)
             if response.status_code == 200 and "[TITLE]" in response.text:
                 return response.text.strip()
         except:
             pass
         time.sleep(1)
-    return "[TITLE]: SYSTEM FAILURE\n[STATUS]: ALIVE\n[STORY]: A glitchy voice says: 'Survive.'"
+    return "[TITLE]: SYSTEM FAILURE\n[STATUS]: ALIVE\n[STORY]: A glitchy voice says: 'Survive 5 turns.'"
 
 def generate_scene(action, current_story, turn, max_turns, lives, inventory, difficulty):
     if turn > max_turns:
@@ -109,7 +119,8 @@ def generate_scene(action, current_story, turn, max_turns, lives, inventory, dif
     
     for attempt in range(2):
         try:
-            response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}", timeout=10)
+            # Increased timeout to 20 seconds to prevent crashes
+            response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}", timeout=20)
             if response.status_code == 200:
                 text = response.text.strip()
                 if "[TITLE]" in text and "[STORY]" in text:
@@ -118,7 +129,8 @@ def generate_scene(action, current_story, turn, max_turns, lives, inventory, dif
             pass
         time.sleep(1)
         
-    return "[TITLE]: GLITCH\n[STATUS]: ALIVE\n[STORY]: The system stutters. [Data Shard]"
+    # If AI fails completely, use the local fallback so the game keeps playing
+    return random.choice(FALLBACK_SCENARIOS)
 
 def parse_ai_response(result):
     title_match = re.search(r"\[TITLE\]:\s*(.*)", result, re.IGNORECASE)
@@ -204,7 +216,7 @@ else:
             st.session_state.clear()
             st.rerun()
 
-    # LOSE SCREEN (FRIENDLY ARCADE EDITION)
+    # LOSE SCREEN
     elif st.session_state.game_over:
         st.markdown(f"<div class='visual-display'>💥</div>", unsafe_allow_html=True)
         st.markdown(f"""
