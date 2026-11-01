@@ -644,6 +644,14 @@ def game_2048(mode, difficulty):
     fresh("g2048_b", init)
     b = st.session_state.g2048_b
 
+    def can_move(r, c):
+        if b[r][c] == 0: return True
+        for dr, dc in [(0,1),(1,0)]:
+            rr, cc = r+dr, c+dc
+            if 0 <= rr < SIZE and 0 <= cc < SIZE and b[rr][cc] == b[r][c]:
+                return True
+        return False
+
     def slide(row):
         non_zero = [x for x in row if x != 0]
         out = []
@@ -683,14 +691,6 @@ def game_2048(mode, difficulty):
                 st.session_state.g2048_over = True
         return changed
 
-    def can_move(r, c):
-        if b[r][c] == 0: return True
-        for dr, dc in [(0,1),(1,0)]:
-            rr, cc = r+dr, c+dc
-            if 0 <= rr < SIZE and 0 <= cc < SIZE and b[rr][cc] == b[r][c]:
-                return True
-        return False
-
     if st.button("🔄 New Game", key="g2048_reset"):
         init(); st.rerun()
 
@@ -700,18 +700,6 @@ def game_2048(mode, difficulty):
     elif st.session_state.g2048_over:
         result_banner("Game over — no more moves.", "lose")
 
-    # Arrow-key handling
-    components.html("""
-    <script>
-    window.addEventListener('keydown', (e) => {
-        if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
-            window.parent.postMessage({type:'2048',key:e.key}, '*');
-        }
-    });
-    </script>
-    """, height=0)
-
-    # Grid display
     for r in range(SIZE):
         cols = st.columns(SIZE)
         for c in range(SIZE):
@@ -724,7 +712,6 @@ def game_2048(mode, difficulty):
                 unsafe_allow_html=True
             )
 
-    # Buttons as fallback (since postMessage rerun needs extra wiring)
     b1, b2, b3 = st.columns([1,1,1])
     if b1.button("⬆️ Up", use_container_width=True) and move("up"): sfx("hit"); st.rerun()
     if b2.button("⬅️ Left", use_container_width=True) and move("left"): sfx("hit"); st.rerun()
@@ -743,13 +730,7 @@ def game_rps(mode, difficulty):
         st.session_state.rps_log = []
 
     def play(move):
-        if mode == "AI":
-            if random.random() < difficulty/5:
-                # best response to human's most frequent
-                pass
-            opp = random.choice(["rock","paper","scissors"])
-        else:
-            opp = random.choice(["rock","paper","scissors"])
+        opp = random.choice(["rock","paper","scissors"])
         if move == opp: res = "draw"
         elif (move=="rock" and opp=="scissors") or (move=="paper" and opp=="rock") or (move=="scissors" and opp=="paper"):
             res = "win"; st.session_state.rps_you += 1
@@ -806,8 +787,7 @@ def game_dice(mode, difficulty):
     if "dice_rounds" not in st.session_state:
         st.session_state.dice_rounds = []
     if st.button("🎲 Roll!", key="dice_roll"):
-        you = random.randint(1, 6)
-        opp = random.randint(1, 6)
+        you = random.randint(1, 6); opp = random.randint(1, 6)
         st.session_state.dice_rounds.append((you, opp))
         sfx("hit")
     if st.session_state.dice_rounds:
@@ -969,21 +949,19 @@ def game_tug(mode, difficulty):
 
 
 # ============================================================
-# PONG (simplified turn-based-ish demo)
+# PONG
 # ============================================================
 def game_pong(mode, difficulty):
     st.subheader("🏓 Pong Duel")
-    st.info("Use the sliders below to move paddles. First to 5 wins the exchange.")
+    st.info("Use the slider to move your paddle. First to 5 wins.")
     if "pong_you" not in st.session_state:
         st.session_state.pong_you = 0
         st.session_state.pong_opp = 0
         st.session_state.pong_bally = 50
         st.session_state.pong_ballx = 50
     ypaddle = st.slider("Your paddle", 0, 100, 50, key="pong_yp")
-    opp_paddle = 50 if mode == "Human" else random.randint(30, 70)
     ball_y = st.session_state.pong_bally
     ball_x = st.session_state.pong_ballx
-
     if st.button("🏓 Hit!", key="pong_hit"):
         if abs(ball_y - ypaddle) < 20:
             st.session_state.pong_you += 1; sfx("win")
@@ -992,7 +970,6 @@ def game_pong(mode, difficulty):
         st.session_state.pong_bally = random.randint(0, 100)
         st.session_state.pong_ballx = random.randint(0, 100)
         st.rerun()
-
     st.caption(f"Ball at (x={ball_x}, y={ball_y}) · You {st.session_state.pong_you} - {st.session_state.pong_opp} Opp")
     if st.session_state.pong_you >= 5:
         result_banner("🏆 You win Pong!", "win")
@@ -1001,22 +978,21 @@ def game_pong(mode, difficulty):
 
 
 # ============================================================
-# SNAKE DUEL (simplified grid demo)
+# SNAKE
 # ============================================================
 def game_snake(mode, difficulty):
     st.subheader("🐍 Snake Duel")
-    st.info("Classic snake mechanics — simplified demo version.")
     if "snake_body" not in st.session_state:
         st.session_state.snake_body = [(5, 5)]
         st.session_state.snake_food = (2, 7)
         st.session_state.snake_score = 0
-        st.session_state.snake_dir = "R"
+        st.session_state.snake_dir = "➡️"
     head = st.session_state.snake_body[0]
     food = st.session_state.snake_food
     cols = st.columns(4)
     for c, d in zip(cols, ["⬆️","⬇️","⬅️","➡️"]):
         if c.button(d, key=f"snake_{d}", use_container_width=True):
-            st.session_state.snake_dir = d[0]
+            st.session_state.snake_dir = d
             st.rerun()
     d = st.session_state.snake_dir
     dr, dc = {"⬆️":(-1,0),"⬇️":(1,0),"⬅️":(0,-1),"➡️":(0,1)}[d]
@@ -1053,7 +1029,6 @@ def game_snake(mode, difficulty):
 # ============================================================
 def game_bey(mode, difficulty):
     st.subheader("🌀 Beyblade Arena")
-    st.info("Spin up your blade — highest momentum wins the clash.")
     if "bey_score" not in st.session_state:
         st.session_state.bey_score = 0
         st.session_state.bey_opp = 0
@@ -1087,7 +1062,7 @@ def game_simon(mode, difficulty):
         if st.button("I'm ready"):
             st.session_state.simon_show = False; st.rerun()
         return
-    st.caption(f"Your input: {len(st.session_state.simon_input)}/{len(st.session_state.simon_seq)} · Score {st.session_state.simon_score}")
+    st.caption(f"Input: {len(st.session_state.simon_input)}/{len(st.session_state.simon_seq)} · Score {st.session_state.simon_score}")
     cols = st.columns(4)
     for i, c in enumerate(COLORS):
         if cols[i].button(c, key=f"simon_{i}", use_container_width=True):
@@ -1112,7 +1087,6 @@ def game_simon(mode, difficulty):
 # ROUTER / ENTRY POINT
 # ============================================================
 def game_router(gid, mode, difficulty):
-    """Dispatch to the game by id, and show a Back button."""
     if st.button("⬅️ Back to Home", key="back_btn"):
         st.session_state.page = "home"
         st.rerun()
