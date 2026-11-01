@@ -56,68 +56,92 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- ASCII VISUALS ---
-ASCII_ART = {
-    "laser": """\n      \\  |  /\n     \\ \\ | / /\n      \\ \\|/ /\n       \\ | /\n    -----------\n    [LASER GRID]\n""",
-    "skull": """\n      _____\n     /     \\\n    | () () |\n     \\  ^  /\n      |||||\n      |||||\n    [SYSTEM FAILURE]\n""",
-    "robot": """\n       [O]\n      /|_|\\\n      [___]\n      /   \\\n     /_____\\\n    [ROGUE AI]\n""",
-    "space": """\n       /\\\n      /  \\\n     /    \\\n    /______\\\n       ||\n       ||\n    [THE VOID]\n""",
-    "door": """\n      _______\n     |       |\n     |   O   |\n     |       |\n     |_______|\n    [ESCAPE ROUTE]\n""",
-    "glitch": """\n    █▀▀ █░░ █ ▀█▀ █▀▀ █░█\n    █▄█ █▄▄ █ ░█░ █▄▄ █▀█\n    [SYSTEM CORRUPTED]\n"""
-}
+ASCII_ART = [
+    """\n      _____\n     /     \\\n    | () () |\n     \\  ^  /\n      |||||\n      |||||\n    [DEATH]\n""",
+    """\n       [O]\n      /|_|\\\n      [___]\n      /   \\\n     /_____\\\n    [ROGUE AI]\n""",
+    """\n      /\\\n     /  \\\n    /    \\\n   /______\\\n      ||\n      ||\n    [THE VOID]\n""",
+    """\n    █▀▀ █░░ █ ▀█▀ █▀▀ █░█\n    █▄█ █▄▄ █ ░█░ █▄▄ █▀█\n    [SYSTEM CORRUPTED]\n""",
+    """\n     .-\"\"\"-.\n    /       \\\n    \\       /\n     `-...-' \n    [ALIEN ENTITY]\n""",
+    """\n      |\\\n      | \\\n      |  \\\n      |  /\n      | /\n      |/\n    [PORTAL]\n"""
+]
 
-def get_visual(text, is_dead):
-    if is_dead: return ASCII_ART["skull"]
-    text = text.lower()
-    if "laser" in text or "fire" in text: return ASCII_ART["laser"]
-    if "robot" in text or "machine" in text or "ai" in text: return ASCII_ART["robot"]
-    if "void" in text or "space" in text or "star" in text: return ASCII_ART["space"]
-    if "door" in text or "exit" in text: return ASCII_ART["door"]
-    if "glitch" in text or "error" in text or "matrix" in text: return ASCII_ART["glitch"]
-    return ASCII_ART["glitch"] # Default
+# --- AI GENERATION FUNCTIONS ---
+def get_starting_scene():
+    prompt = """
+    You are the Game Master of a deadly text adventure game. The player is trapped in a glitchy, chaotic sci-fi simulation.
+    Generate a random, crazy starting scenario. 
+    You must reply in EXACTLY this format:
+    [TITLE]: (A short 1-3 word dramatic title, like "THE AWAKENING" or "GRAVITY FAILURE")
+    [STATUS]: ALIVE
+    [STORY]: (Write a short paragraph, max 3 sentences, describing where they are and the immediate danger.)
+    """
+    try:
+        response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}")
+        return response.text.strip()
+    except:
+        return "[TITLE]: ERROR\n[STATUS]: ALIVE\n[STORY]: The simulation stutters."
 
-# --- AI GENERATION FUNCTION ---
-def generate_next_scene(action, current_story, lives):
+def generate_next_scene(action, current_story):
     prompt = f"""
     You are the Game Master of a deadly text adventure game. The player is trapped in a glitchy sci-fi simulation.
     Current Story: {current_story}
     Player Action: {action}
     
     You must reply in EXACTLY this format:
-    [TITLE]: (A short 1-3 word dramatic title for this scene, like "THE LASER GRID" or "DEAD END")
+    [TITLE]: (A short 1-3 word dramatic title for this new scene)
     [STATUS]: (Write strictly "ALIVE" if they survive, or "DEAD" if they fail/die)
-    [STORY]: (Write a short paragraph, max 3 sentences, describing what happens. Be dark, sarcastic, and fast-paced.)
+    [STORY]: (Write a short paragraph, max 3 sentences, describing what happens next. Be dark, sarcastic, and fast-paced.)
     """
-    
     try:
         response = requests.get(f"https://text.pollinations.ai/{requests.utils.quote(prompt)}")
-        if response.status_code == 200:
-            return response.text.strip()
-        return "[TITLE]: ERROR\n[STATUS]: ALIVE\n[STORY]: The simulation stutters."
+        return response.text.strip()
     except:
-        return "[TITLE]: TIMEOUT\n[STATUS]: ALIVE\n[STORY]: Network lag."
+        return "[TITLE]: ERROR\n[STATUS]: ALIVE\n[STORY]: The simulation stutters."
+
+def parse_ai_response(result):
+    title_match = re.search(r"\[TITLE\]:\s*(.*)", result, re.IGNORECASE)
+    status_match = re.search(r"\[STATUS\]:\s*(.*)", result, re.IGNORECASE)
+    story_match = re.search(r"\[STORY\]:\s*(.*)", result, re.IGNORECASE | re.DOTALL)
+    
+    title = title_match.group(1).strip() if title_match else "UNKNOWN SECTOR"
+    is_dead = "DEAD" in status_match.group(1).upper() if status_match else False
+    story = story_match.group(1).strip() if story_match else result
+    
+    return title, story, is_dead
 
 # --- STATE MANAGEMENT ---
-if "story" not in st.session_state: st.session_state.story = "You wake up in a dark, digital void. A robotic voice echoes: 'PROVE YOUR WORTH OR BE DELETED.' A glowing red laser grid slowly advances toward you."
-if "title" not in st.session_state: st.session_state.title = "THE AWAKENING"
 if "lives" not in st.session_state: st.session_state.lives = 3
 if "score" not in st.session_state: st.session_state.score = 0
 if "game_over" not in st.session_state: st.session_state.game_over = False
+if "initialized" not in st.session_state: st.session_state.initialized = False
+
+# Start game for the first time
+if not st.session_state.initialized:
+    with st.spinner("Booting simulation..."):
+        raw = get_starting_scene()
+        title, story, _ = parse_ai_response(raw)
+        st.session_state.title = title
+        st.session_state.story = story
+        st.session_state.initialized = True
 
 # --- MAIN UI ---
 st.markdown("<h1>💀 AI SURVIVAL 💀</h1>", unsafe_allow_html=True)
 
 if st.session_state.game_over:
     st.markdown(f"<h2 style='color:red; text-align:center;'>{st.session_state.title}</h2>", unsafe_allow_html=True)
-    st.markdown(f'<div class="ascii-art" style="color:#ff0000; text-shadow: 0 0 10px #ff0000;">{ASCII_ART["skull"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="ascii-art" style="color:#ff0000; text-shadow: 0 0 10px #ff0000;">{ASCII_ART[0]}</div>', unsafe_allow_html=True)
     st.error("SYSTEM TERMINATED. YOU ARE DEAD.")
     st.metric("Final Score", st.session_state.score)
     if st.button("REBOOT SYSTEM"):
-        st.session_state.story = "You wake up in a dark, digital void. A robotic voice echoes: 'PROVE YOUR WORTH OR BE DELETED.' A glowing red laser grid slowly advances toward you."
-        st.session_state.title = "THE AWAKENING"
-        st.session_state.lives = 3
-        st.session_state.score = 0
-        st.session_state.game_over = False
-        st.rerun()
+        with st.spinner("Rebooting..."):
+            raw = get_starting_scene()
+            title, story, _ = parse_ai_response(raw)
+            st.session_state.title = title
+            st.session_state.story = story
+            st.session_state.lives = 3
+            st.session_state.score = 0
+            st.session_state.game_over = False
+            st.rerun()
 else:
     # Status Bar
     st.markdown(f"""
@@ -130,8 +154,11 @@ else:
     # Dynamic Title
     st.markdown(f"<h2 style='color:#00ffff; text-shadow: 0 0 10px #00ffff;'>{st.session_state.title}</h2>", unsafe_allow_html=True)
     
-    # Visuals (ASCII)
-    st.markdown(f'<div class="ascii-art">{get_visual(st.session_state.story, False)}</div>', unsafe_allow_html=True)
+    # Randomized Visuals (Picks a new graphic every rerun)
+    if "current_visual" not in st.session_state:
+        st.session_state.current_visual = random.choice(ASCII_ART)
+        
+    st.markdown(f'<div class="ascii-art">{st.session_state.current_visual}</div>', unsafe_allow_html=True)
     
     # Story Display
     st.markdown(f'<div class="terminal-box">{st.session_state.story}</div>', unsafe_allow_html=True)
@@ -144,18 +171,15 @@ else:
     if submit and action:
         with st.spinner("Processing reality..."):
             # Get AI response
-            result = generate_next_scene(action, st.session_state.story, st.session_state.lives)
+            result = generate_next_scene(action, st.session_state.story)
+            title, story, is_dead = parse_ai_response(result)
             
-            # Parse the AI response
-            title_match = re.search(r"\[TITLE\]:\s*(.*)", result, re.IGNORECASE)
-            status_match = re.search(r"\[STATUS\]:\s*(.*)", result, re.IGNORECASE)
-            story_match = re.search(r"\[STORY\]:\s*(.*)", result, re.IGNORECASE | re.DOTALL)
+            # Update state
+            st.session_state.title = title
+            st.session_state.story = f"> {action}\n\n{story}"
+            st.session_state.current_visual = random.choice(ASCII_ART) # Randomize visual on every turn
             
-            if title_match: st.session_state.title = title_match.group(1).strip()
-            if story_match: st.session_state.story = f"> {action}\n\n{story_match.group(1).strip()}"
-            
-            # Check if they died
-            if status_match and "DEAD" in status_match.group(1).upper():
+            if is_dead:
                 st.session_state.lives -= 1
                 if st.session_state.lives <= 0:
                     st.session_state.game_over = True
